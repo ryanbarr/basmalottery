@@ -24,7 +24,7 @@
 
         <!-- Setup instances and event listeners. -->
         <script>
-        var lottery = new Basmalottery({ randomizer: 'manual' });
+        var lottery = new Basmalottery({ debug: true, randomizer: 'manual' });
 
         $(function(){
 
@@ -40,9 +40,10 @@
             });
 
             /**
-             * Create a generic data-binding for use in the view.
+             * Create a generic data-binding pubsub system for the view. Again,
+             * this being a simple application we're not going to use a fully-
+             * featured MVVM framework and something quick will meet our needs.
              */
-            $document.on
 
         });
         </script>

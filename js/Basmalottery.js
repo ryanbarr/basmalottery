@@ -24,6 +24,7 @@ var Basmalottery = function(options){
      *          var lottery = new Basmalottery({ maxPlayerTickets: 1337 });
      */
     self.defaults = {
+        debug: false,
         // The maximum number of tickets a player may have.
         maxPlayerTickets: 10,
         // The players balance. This should be zero and updated in init().
@@ -52,37 +53,130 @@ var Basmalottery = function(options){
      * properties - The properties of the current object. Any properties passed
      *      into the constructor will override the default properties.
      */
-    self.properties = $.extend({}, self.defaults, options);
+    self.properties = {};
 
     /**
      * init - This method gets executed by the constructor upon returning the
      *      new instance.
+     *
+     * @return {Object}             Returns the current instance.
      */
     self.init = function() {
-        // Set the player's balance to the starting money.
+        // Start a timer so we can debug the weight of initialization.
+        var timer = self.timer.start();
 
+        // Setup data binding. Listen for any change event on our instance.
+        $(self).on('change', function(event, property, value) {
+            // Update the view to reflect the value of the changed property.
+            $('*[data-bind="'+ property +'"]').html(value);
+        });
+
+        // Set all properties based on defaults and options.
+        _.each($.extend({}, self.defaults, options), function(value, property){
+            // Set properties using our setter so we can trigger change events.
+            self.set(property, value);
+        });
+
+        // Set the player's balance to the starting money.
+        self.set('playerBalance', self.get('playerStartingMoney'));
+
+        // Log that initialization is complete.
+        self.log('Completed initialization of a new Basmalottery object in '+ timer.stop() +' seconds.');
+
+        // Return the current instance so we can chain methods.
+        return self;
     };
 
     /**
      * get - Returns the value of property from the lottery instance.
      *
-     * @param  {String} property The property name to return from the instance.
-     * @return {Object}          The value of the property on the properties object.
+     * @param  {String} property    The property name to return from the instance.
+     * @return {Object}             The value of the property on the properties object.
      */
     self.get = function(property) {
+        // Return the value of the requested property.
         return self.properties[property];
     };
 
     /**
      * set - Sets the value of a property on the lottery instance.
      *
-     * @param {String} property The property name to set the value of.
-     * @param {Object} value    The value to set on the defined property.
-     * @return {Object}         Returns the current instance.
+     * @param {String} property     The property name to set the value of.
+     * @param {Object} value        The value to set on the defined property.
+     * @return {Object}             Returns the current instance.
      */
     self.set = function(property, value) {
+        self.log('Updating `'+ property +'` with value: ', value);
+
+        // Set the value of the property on our properties object.
         self.properties[property] = value;
+
+        // Trigger the change event so we can handle things like data-binding.
+        $(self).trigger('change', [ property, value ]);
+
+        // Return the current instance so we can chain methods.
         return self;
+    };
+
+    /**
+     * log - Conditionally logs messages to the console based on the debug flag
+     *      set on the current instance.
+     *
+     * @return {Object}             Returns the current instance.
+     */
+    self.log = function() {
+        // If the debug flag is active, console.log as requested.
+        if (self.get('debug')) {
+            console.log.apply(console, arguments);
+        }
+
+        // Return the current instance so we can chain methods.
+        return self;
+    };
+
+    /**
+     * timer - A set of functions which can be used to time synchronous actions.
+     */
+    self.timer = {
+        // The current stored stamps. This should not be access directly.
+        stamps: {},
+
+        /**
+         * start - Starts a timer and returns a unique timer id.
+         *
+         * @return {String}  The timer id which is used to stop the timer.
+         */
+        start: function() {
+            // Capture the current timestamp.
+            var now = _.now(),
+                id = _.uniqueId('timer');
+
+            // Store the stamp so we can see what stamps are active.
+            self.timer.stamps[id] = now;
+
+            // Return the stamp id so it can be stopped later.
+            return {
+                id: id,
+                stop: function() {
+                    // Attempt to find the timer with the assigned id.
+                    if (self.timer.stamps[id]) {
+                        var now = _.now(),
+                            // Convert the difference of the timestamps to seconds.
+                            seconds = ((now - self.timer.stamps[id]) / 1000).toFixed(3);
+
+                        // Delete the property from the object to avoid clutter.
+                        delete self.timer.stamps[id];
+
+                        // Return the number of seconds that it took to run this timer.
+                        return seconds;
+                    } else {
+                        // Log that we've attempted stopping a timer that doesn't exist.
+                        self.log('Attempted to stop timer `'+ id +'` but it was already stopped.');
+                        return -1;
+                    }
+                }
+            };
+        }
     };
 
     /**
@@ -94,6 +188,9 @@ var Basmalottery = function(options){
      * @return {Integer}            The randomly generated number.
      */
     self.generateNumber = function(minimum, maximum) {
+        // Log that we're generating a random number.
+        self.log('Generating a random number between '+ minimum +' and '+ maximum +'.');
+
         var randomNumber = null,
             randomizerMethod = self.get('randomizer');
 
@@ -103,11 +200,14 @@ var Basmalottery = function(options){
         // Utilize the RANDOM.org API to generate a random number.
         if (randomizerMethod === 'randomorg') {
 
+
+
         // Utilize JavaScript Math to generate a random number.
         } else {
             randomNumber = Math.floor(Math.random() * maximum) + minimum;
         }
 
+        // Return the generated number.
         return randomNumber;
     };
 
@@ -115,10 +215,17 @@ var Basmalottery = function(options){
      * generateWinningNumbers - Randomly generates four winning numbers and
      *      returns them as an array.
      *
-     * @param {Integer} count   The number of winning numbers to generate.
-     * @return {Array}          The winning numbers.
+     * @param {Integer} count       The number of winning numbers to generate.
+     * @return {Array}              The winning numbers.
      */
     self.generateWinningNumbers = function(count) {
+        // Log that we're generating numbers.
+        self.log('Generating '+ count +' winning numbers.');
+
+        // Start a timer that we can use for debugging later.
+        var timer = self.timer.start();
+
+        // Declare a variable to store our generated numbers.
         var winningNumbers = [];
 
         // Add `count` winning numbers to the array.
@@ -133,6 +240,10 @@ var Basmalottery = function(options){
             winningNumbers.push(randomNumber);
         }
 
+        // Log that we've completed generating the random numbers.
+        self.log('Generated '+ count +' random numbers in '+ timer.stop() +' seconds.');
+
+        // Return the array of winning numbers.
         return winningNumbers;
     };
 
@@ -149,5 +260,5 @@ var Basmalottery = function(options){
         return _.intersection(ticketNumbers, winningNumbers).length;
     };
 
-    return self;
+    return self.init();
 };
