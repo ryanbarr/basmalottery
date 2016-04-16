@@ -250,6 +250,11 @@ var Basmalottery = function(options){
         // If we have an error, end execution of the function after informing the user of the error.
         if (hasError) {
             $('#error').html('Please fill out all numbers, be sure they are '+ ticketMinimumNumber +'-'+ ticketMaximumNumber +' inclusively, and are unqiue.');
+
+            // Log that we've seen an error upon ticket creation.
+            self.log('Unable to save ticket due to validation errors on these values: ', form);
+
+            // Return the current instance so we end the function and can chain methods.
             return self;
         }
 
@@ -262,6 +267,10 @@ var Basmalottery = function(options){
         // Add the newest ticket to our instance so it persists in memory.
         self.set('playerTickets', currentTickets);
 
+        // Log that we've successfully added a ticket.
+        self.log('Successfully added new ticket with numbers: ', ticket);
+
+        // Return the current instance so we can chain methods.
         return self;
     };
 
