@@ -11,15 +11,19 @@
     </head>
     <body>
         <h1>Lottery Prototype</h1>
-        <p><strong>Player Balance:</strong> <span data-bind="playerBalance"></span></p>
-        <p><strong>Player Ticket Count:</strong> <span data-bind="playerTickets"></span></p>
-        <p id="error" class="error"></p>
+        <p><strong>Player Balance:</strong> <span data-bind="playerBalance" data-formatter="currency"></span></button></p>
+        <p><strong>Player Ticket Count:</strong> <span data-bind="playerTicketsCount"></span></p>
+        <div id="playerTickets"> </div>
+        <p id="error" class="error" style="display:none;"></p>
         <form class="addTicket" id="addTicket">
             <input type="number" min="1" max="10" name="number1" class="ticketNumber" id="number1">
             <input type="number" min="1" max="10" name="number2" class="ticketNumber" id="number2">
             <input type="number" min="1" max="10" name="number3" class="ticketNumber" id="number3">
             <input type="number" min="1" max="10" name="number4" class="ticketNumber" id="number4">
-            <button data-action="addTicket">Buy Ticket</button>
+            <button data-action="addTicket">Add Ticket</button>
+        </form>
+        <form class="buyTickets" id="buyTickets" style="display:none;">
+            <button data-action="buyTickets">Buy <span data-bind="playerTicketsCount"></span> Tickets for <span data-bind="ticketSubtotal" data-formatter="currency"></span></button>
         </form>
 
         <!-- Include Libraries -->

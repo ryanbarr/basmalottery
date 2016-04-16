@@ -42,6 +42,8 @@ var Basmalottery = function(options){
         randomizer: 'randomorg',
         // The total cost of a single ticket.
         ticketCost: 2.0,
+        // The subtotal cost of all ticket sales before purchase.
+        ticketSubtotal: 0,
         // The lowest number a ticket can be.
         ticketMinimumNumber: 1,
         // The highest number a ticket can be.
@@ -70,6 +72,25 @@ var Basmalottery = function(options){
     };
 
     /**
+     * formatters - Formatters are used to format data for presentation.
+     */
+    self.formatters = {
+        currency: function(value) {
+            return '$' + value.toFixed(2);
+        }
+    };
+
+    /**
+     * templates - These are strings which are parsed and have variables
+     *      injected into them. This application uses Underscore templating.
+     *      While formal tmpl files would be nice, AMD loading templates is a
+     *      bit out of scope for this project.
+     */
+    self.templates = {
+        'playerTicket': '<div class="playerTicket"><strong>Ticket #<%=ticketNumber %>:</strong> <%=ticket.join(", ") %> <a href="javascript:void(0);" data-action="deleteTicket" data-id="<%=ticketNumber-1 %>">X<a></div>'
+    };
+
+    /**
      * init - This method gets executed by the constructor upon returning the
      *      new instance.
      *
@@ -92,14 +113,22 @@ var Basmalottery = function(options){
 
         // Setup data binding. Listen for any change event on our instance.
         $(self).on('change', function(event, property, value) {
+            var $bind = $('*[data-bind="'+ property +'"]'),
+                data = $bind.data() || {};
+
+            // If a formatter is requested and exists, format the value first.
+            if (data.formatter && self.formatters[data.formatter]) {
+                value = self.formatters[data.formatter](value);
+            }
+
             // Update the view to reflect the value of the changed property.
-            $('*[data-bind="'+ property +'"]').html(value);
+            $bind.html(value);
         });
 
         // Set all properties based on defaults and options.
         _.each($.extend({}, self.defaults, options), function(value, property){
             // Set properties using our setter so we can trigger change events.
-            self.set(property, value);
+            self.set(property, value, false, true);
         });
 
         // Set the player's balance to the starting money.
@@ -113,10 +142,37 @@ var Basmalottery = function(options){
     };
 
     /**
+     * clearError - Clears the currently displayed error from the view.
+     *
+     * @return {Object}                 Returns the current instance.
+     */
+    self.clearError = function() {
+        // Update the display state and contents of the error element.
+        $('#error').hide().html('');
+
+        // Return the current instance so we can chain methods.
+        return self;
+    };
+
+    /**
+     * error - Takes an error message and presents it to the user.
+     *
+     * @param  {String} message         The message to display to the user.
+     * @return {Object}                 Returns the current instance.
+     */
+    self.error = function(message) {
+        // Update the display state and contents of the error element.
+        $('#error').show().html(message);
+
+        // Return the current instance so we can chain methods.
+        return self;
+    };
+
+    /**
      * get - Returns the value of property from the lottery instance.
      *
-     * @param  {String} property    The property name to return from the instance.
-     * @return {Object}             The value of the property on the properties object.
+     * @param  {String} property        The property name to return from the instance.
+     * @return {Object}                 The value of the property on the properties object.
      */
     self.get = function(property) {
         // Return the value of the requested property.
@@ -124,23 +180,66 @@ var Basmalottery = function(options){
     };
 
     /**
+     * getTemplate - Returns an Underscore template (if it exists) for the named
+     *      template. If the template exists but has not been converted yet, the
+     *      conversion is done and is cached. This prevents us from building
+     *      templates upon initialization which may never be used, but buys us
+     *      the benefit of caching to prevent rebuilding the same template.
+     *
+     * @param  {type} templateName      description
+     * @return {type}              description
+     */
+    self.getTemplate = function(templateName) {
+        // Log that we're attempting to locate a template.
+        self.log('Fetching template: ', templateName);
+
+        // Store what we know about the template in a variable.
+        var template = self.templates[templateName];
+
+        // Be sure the template exists before attempting to work with it.
+        if (template) {
+            // If the template is still a string, build it first.
+            if (_.isString(template)) {
+                // Log that we need to build the template.
+                self.log('Building template: ', templateName);
+
+                // Build the Underscore template.
+                self.templates[templateName] = template = _.template(template);
+            }
+
+            // Return the built template.
+            return template;
+        } else {
+            // Log that we attempted to find a non-existent template.
+            self.log('Unable to find template using the name: ', templateName);
+            return null;
+        }
+    };
+
+    /**
      * set - Sets the value of a property on the lottery instance.
      *
-     * @param {String} property     The property name to set the value of.
-     * @param {Object} value        The value to set on the defined property.
-     * @return {Object}             Returns the current instance.
+     * @param {String} property         The property name to set the value of.
+     * @param {Object} value            The value to set on the defined property.
+     * @param [Boolean] silent          If true, does not trigger any event changes.
+     * @param [Boolean] silentProperty  If true, does not trigger only property events.
+     * @return {Object}                 Returns the current instance.
      */
-    self.set = function(property, value) {
+    self.set = function(property, value, silent, silentProperty) {
         self.log('Updating `'+ property +'` with value: ', value);
 
         // Set the value of the property on our properties object.
         self.properties[property] = value;
 
-        // Trigger the global change event so we can handle things like data-binding.
-        $(self).trigger('change', [property, value]);
+        if (!silent) {
+            // Trigger the global change event so we can handle things like data-binding.
+            $(self).trigger('change', [property, value]);
 
-        // Trigger the property change event so we can handle property hooks.
-        $(self).trigger('change:'+ property, [property, value]);
+            if (!silentProperty) {
+                // Trigger the property change event so we can handle property hooks.
+                $(self).trigger('change:'+ property, [property, value]);
+            }
+        }
 
         // Return the current instance so we can chain methods.
         return self;
@@ -229,7 +328,7 @@ var Basmalottery = function(options){
 
         // Reset the form state.
         $('.ticketNumber').removeClass('error');
-        $('#error').html('');
+        self.clearError();
 
         // Iterate over the expected amount of numbers.
         for (var i = 1; i <= self.get('maxNumbersPerTicket'); i++) {
@@ -249,7 +348,7 @@ var Basmalottery = function(options){
 
         // If we have an error, end execution of the function after informing the user of the error.
         if (hasError) {
-            $('#error').html('Please fill out all numbers, be sure they are '+ ticketMinimumNumber +'-'+ ticketMaximumNumber +' inclusively, and are unqiue.');
+            self.error('Please fill out all numbers, be sure they are '+ ticketMinimumNumber +'-'+ ticketMaximumNumber +' inclusively, and are unqiue.');
 
             // Log that we've seen an error upon ticket creation.
             self.log('Unable to save ticket due to validation errors on these values: ', form);
@@ -275,6 +374,33 @@ var Basmalottery = function(options){
     };
 
     /**
+     * buyTickets - Binds to a button press or link click and processes the form
+     *      on the page with the id #buyTickets. It validates that the player
+     *      has enough money in their balance to purchase the tickets, updates
+     *      the balance, and begins the lottery drawing.
+     *
+     * @return {Object}             Returns the current instance.
+     */
+    self.buyTickets = function() {
+        var playerBalance = self.get('playerBalance'),
+            ticketSubtotal = self.get('ticketSubtotal');
+
+        // Confirm that the player has enough money in their balance to afford the requested tickets.
+        if (playerBalance >= ticketSubtotal) {
+            // Subtract the total amount for the tickets from the player's balance.
+            self.set('playerBalance', playerBalance - ticketSubtotal);
+        } else {
+            // Log that the player attempted to purchase more tickets than they could afford.
+            self.log('Player does not have enough money to buy tickets.');
+
+            self.error('Sorry, but you do not have enough funds to purchase these tickets.');
+        }
+
+        // Return the current instance so we can chain methods.
+        return self;
+    };
+
+    /**
      * checkNumberMatchCount - Takes a set of numbers and compares them to the
      *          another set numbers and returns a total count of matches.
      *
@@ -285,6 +411,26 @@ var Basmalottery = function(options){
     self.checkNumberMatchCount = function(ticketNumbers, winningNumbers) {
         // Return the length of the array which includes the matching numbers.
         return _.intersection(ticketNumbers, winningNumbers).length;
+    };
+
+    /**
+     * addTicket - Binds to a button press or link click and processes the form
+     *      expects data attributes to process the removal of a ticket.
+     *
+     * @return {Object}             Returns the current instance.
+     */
+    self.deleteTicket = function(link) {
+        var data = $(link).data(),
+            playerTickets = self.get('playerTickets');
+
+        // Remove the ticket from the list of tickets.
+        playerTickets.splice(data.id, 1);
+
+        // Set the new curerntTickets back onto our instance.
+        self.set('playerTickets', playerTickets);
+
+        // Return the current instance so we can chain methods.
+        return self;
     };
 
     /**
@@ -359,8 +505,39 @@ var Basmalottery = function(options){
      * @return {Object}             Returns the current instance.
      */
     self.handlePlayerTicketsUpdate = function() {
+        var playerTickets = self.get('playerTickets'),
+            $playerTickets = $('#playerTickets'),
+            playerTicketTemplate = self.getTemplate('playerTicket');
+
         // Set the total number of player tickets to the length of the array.
-        self.set('playerTicketsCount', self.get('playerTickets').length);
+        self.set('playerTicketsCount', playerTickets.length);
+
+        // Set the subtotal cost of ticket sales to reflect the current tickets.
+        self.set('ticketSubtotal', parseFloat(self.get('ticketCost')) * playerTickets.length);
+
+        // If we've reached our maximum tickets, hide the form. Otherwise, keep it shown.
+        $('#addTicket').toggle(playerTickets.length < self.get('maxPlayerTickets'));
+
+        // If we have at least one ticket, show the option to buy.
+        $('#buyTickets').toggle(playerTickets.length > 0);
+
+        /* Re-drawing all tickets is ineffecient, but due to us using a simple
+         * pubsub system we don't receive differences. */
+
+        // Delete existing tickets from the view.
+        $playerTickets.html('');
+
+        // Draw the player tickets.
+        for (var ticketNumber in playerTickets) {
+            var ticketNumber = parseInt(ticketNumber),
+                ticket = playerTickets[ticketNumber];
+
+            // Render the current ticket into the view.
+            $playerTickets.append(playerTicketTemplate({
+                ticketNumber: ticketNumber+1,
+                ticket: ticket
+            }));
+        }
 
         // Return the current instance so we can chain methods.
         return self;
