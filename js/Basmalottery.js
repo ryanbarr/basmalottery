@@ -24,7 +24,10 @@ var Basmalottery = function(options){
      *          var lottery = new Basmalottery({ maxPlayerTickets: 1337 });
      */
     self.defaults = {
+        // Turns on console.log statements for debugging purposes.
         debug: false,
+        // The total numbers expected per ticket.
+        maxNumbersPerTicket: 4,
         // The maximum number of tickets a player may have.
         maxPlayerTickets: 10,
         // The players balance. This should be zero and updated in init().
@@ -33,6 +36,8 @@ var Basmalottery = function(options){
         playerStartingMoney: 10.0,
         // The players current active tickets. By default, this should be empty.
         playerTickets: [],
+        // The total number of tickets a player has.
+        playerTicketsCount: 0,
         // The randomizer to use when generating random numbers.
         randomizer: 'randomorg',
         // The total cost of a single ticket.
@@ -56,6 +61,15 @@ var Basmalottery = function(options){
     self.properties = {};
 
     /**
+     * hooks - Hooks listen for changes to the specified property and fire the
+     *      functions listed in the associated array. For example:
+     *          'change:playerBalance': ['functionName', 'anotherFunction']
+     */
+    self.hooks = {
+        'change:playerTickets': ['handlePlayerTicketsUpdate']
+    };
+
+    /**
      * init - This method gets executed by the constructor upon returning the
      *      new instance.
      *
@@ -64,6 +78,17 @@ var Basmalottery = function(options){
     self.init = function() {
         // Start a timer so we can debug the weight of initialization.
         var timer = self.timer.start();
+
+        // Bind all hooks to their appropriate events.
+        for (var eventName in self.hooks) {
+            var methods = self.hooks[eventName];
+            $(self).on(eventName, function(){
+                for (var methodIndex in methods) {
+                    var methodName = methods[methodIndex];
+                    self[methodName].apply(self, arguments);
+                }
+            });
+        }
 
         // Setup data binding. Listen for any change event on our instance.
         $(self).on('change', function(event, property, value) {
@@ -111,8 +136,11 @@ var Basmalottery = function(options){
         // Set the value of the property on our properties object.
         self.properties[property] = value;
 
-        // Trigger the change event so we can handle things like data-binding.
-        $(self).trigger('change', [ property, value ]);
+        // Trigger the global change event so we can handle things like data-binding.
+        $(self).trigger('change', [property, value]);
+
+        // Trigger the property change event so we can handle property hooks.
+        $(self).trigger('change:'+ property, [property, value]);
 
         // Return the current instance so we can chain methods.
         return self;
@@ -179,6 +207,77 @@ var Basmalottery = function(options){
         }
     };
 
+    // METHODS BELOW THIS LINE SHOULD BE ALPHABETIZED.
+
+    /**
+     * addTicket - Binds to a button press or link click and processes the form
+     *      on the page with the id #addTicket. It validates the values and will
+     *      error if necessary. When a valid ticket is found, it adds it to the
+     *      current instance and updates the view.
+     *
+     * @return {Object}             Returns the current instance.
+     */
+    self.addTicket = function() {
+        // Serialize the form and declare default states.
+        var $addTicket = $('#addTicket'),
+            form = $addTicket.serializeObject(),
+            hasError = false,
+            ticket = [],
+            currentTickets = self.get('playerTickets'),
+            ticketMinimumNumber = self.get('ticketMinimumNumber'),
+            ticketMaximumNumber = self.get('ticketMaximumNumber');
+
+        // Reset the form state.
+        $('.ticketNumber').removeClass('error');
+        $('#error').html('');
+
+        // Iterate over the expected amount of numbers.
+        for (var i = 1; i <= self.get('maxNumbersPerTicket'); i++) {
+            // Clean the currentNumber and parse it as an integer.
+            var currentNumber = parseInt(form['number'+i].trim());
+
+            // Check that the number is real, within our expected range, and not already on our ticket.
+            if (!_.isNaN(currentNumber) && currentNumber >= ticketMinimumNumber && currentNumber <= ticketMaximumNumber && !_.contains(ticket, currentNumber)) {
+                // Store the number on the current ticket.
+                ticket.push(currentNumber);
+            // Flag that we have an error and indicate the error on the appropriate field.
+            } else {
+                hasError = true;
+                $('#number'+i).addClass('error');
+            }
+        }
+
+        // If we have an error, end execution of the function after informing the user of the error.
+        if (hasError) {
+            $('#error').html('Please fill out all numbers, be sure they are '+ ticketMinimumNumber +'-'+ ticketMaximumNumber +' inclusively, and are unqiue.');
+            return self;
+        }
+
+        // If we have received a valid ticket, add it to the player's current tickets.
+        currentTickets.push(ticket);
+
+        // Clear the form so the user may enter another ticket.
+        $addTicket[0].reset();
+
+        // Add the newest ticket to our instance so it persists in memory.
+        self.set('playerTickets', currentTickets);
+
+        return self;
+    };
+
+    /**
+     * checkNumberMatchCount - Takes a set of numbers and compares them to the
+     *          another set numbers and returns a total count of matches.
+     *
+     * @param  {Array} ticketNumbers    The numbers of a player ticket.
+     * @param  {Array} winningNumbers   The winning numbers to check against.
+     * @return {Integer}                The count of matches between the arrays.
+     */
+    self.checkNumberMatchCount = function(ticketNumbers, winningNumbers) {
+        // Return the length of the array which includes the matching numbers.
+        return _.intersection(ticketNumbers, winningNumbers).length;
+    };
+
     /**
      * generateNumber - Generates a number between two points, with a minimum
      *      number being 0.
@@ -199,8 +298,6 @@ var Basmalottery = function(options){
 
         // Utilize the RANDOM.org API to generate a random number.
         if (randomizerMethod === 'randomorg') {
-
-
 
         // Utilize JavaScript Math to generate a random number.
         } else {
@@ -248,16 +345,16 @@ var Basmalottery = function(options){
     };
 
     /**
-     * checkNumberMatchCount - Takes a set of numbers and compares them to the
-     *          another set numbers and returns a total count of matches.
+     * handlePlayerTicketsUpdate - Event handler for playerTickets updates.
      *
-     * @param  {Array} ticketNumbers    The numbers of a player ticket.
-     * @param  {Array} winningNumbers   The winning numbers to check against.
-     * @return {Integer}                The count of matches between the arrays.
+     * @return {Object}             Returns the current instance.
      */
-    self.checkNumberMatchCount = function(ticketNumbers, winningNumbers) {
-        // Return the length of the array which includes the matching numbers.
-        return _.intersection(ticketNumbers, winningNumbers).length;
+    self.handlePlayerTicketsUpdate = function() {
+        // Set the total number of player tickets to the length of the array.
+        self.set('playerTicketsCount', self.get('playerTickets').length);
+
+        // Return the current instance so we can chain methods.
+        return self;
     };
 
     return self.init();
