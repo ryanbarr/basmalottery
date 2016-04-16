@@ -5,6 +5,15 @@
     </head>
     <body>
         <h1>Lottery Prototype</h1>
+        <p><strong>Player Balance:</strong> <span data-bind="playerBalance"></span></p>
+
+        <div class="create-ticket">
+            <input type="number" min="1" max="10" name="number1" id="number1">
+            <input type="number" min="1" max="10" name="number2" id="number2">
+            <input type="number" min="1" max="10" name="number3" id="number3">
+            <input type="number" min="1" max="10" name="number4" id="number4">
+            <button type="submit" data-action="addTicket">Buy Ticket</button>
+        </div>
 
         <!-- Include Libraries -->
         <script src="lib/js/underscore-min.js"></script>
@@ -16,6 +25,26 @@
         <!-- Setup instances and event listeners. -->
         <script>
         var lottery = new Basmalottery({ randomizer: 'manual' });
+
+        $(function(){
+
+            /**
+             * Create a global event bus. Since this is a quick application we
+             * don't need a framework. A simple binding of events to any element
+             * with data-action will attempt to call the value of the data-action
+             * attribute as a method on the lottery object.
+             */
+            $(document).on('click', '*[data-action]', function(event){
+                var action = $(this).data('action');
+                lottery[action](this, event);
+            });
+
+            /**
+             * Create a generic data-binding for use in the view.
+             */
+            $document.on
+
+        });
         </script>
     </body>
 </html>
