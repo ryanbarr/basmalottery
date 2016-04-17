@@ -47,7 +47,7 @@ var Basmalottery = function(options){
         // The lowest number a ticket can be.
         ticketMinimumNumber: 1,
         // The highest number a ticket can be.
-        ticketMaximumNumber: 10
+        ticketMaximumNumber: 50
     };
 
     /**
@@ -76,7 +76,12 @@ var Basmalottery = function(options){
      */
     self.formatters = {
         currency: function(value) {
-            return '$' + value.toFixed(2);
+            var decimal = value.toFixed(2),
+                split = decimal.split('.'),
+                dollars = split[0].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","),
+                cents = split[1];
+
+            return '$' + dollars + '.' + cents;
         }
     };
 
@@ -87,7 +92,8 @@ var Basmalottery = function(options){
      *      bit out of scope for this project.
      */
     self.templates = {
-        'playerTicket': '<div class="playerTicket"><strong>Ticket #<%=ticketNumber %>:</strong> <%=ticket.join(", ") %> <a href="javascript:void(0);" data-action="deleteTicket" data-id="<%=ticketNumber-1 %>">X<a></div>'
+        'playerTicket': '<div class="playerTicket"><strong>Ticket #<%=ticketNumber %>:</strong> <%=ticket.join(", ") %> <a href="javascript:void(0);" data-action="deleteTicket" data-id="<%=ticketNumber-1 %>">X<a></div>',
+        'winningNumbers': '<div class="winningNumbers"><strong>Winning Numbers: <em><%=winningNumbers.join(", ") %></em></strong></div>'
     };
 
     /**
@@ -223,7 +229,7 @@ var Basmalottery = function(options){
      * @param {Object} value            The value to set on the defined property.
      * @param [Boolean] silent          If true, does not trigger any event changes.
      * @param [Boolean] silentProperty  If true, does not trigger only property events.
-     * @return {Object}                 Returns the current instance.
+     * @return {Object}                 The updated value of the object.
      */
     self.set = function(property, value, silent, silentProperty) {
         self.log('Updating `'+ property +'` with value: ', value);
@@ -242,7 +248,7 @@ var Basmalottery = function(options){
         }
 
         // Return the current instance so we can chain methods.
-        return self;
+        return value;
     };
 
     /**
@@ -383,12 +389,46 @@ var Basmalottery = function(options){
      */
     self.buyTickets = function() {
         var playerBalance = self.get('playerBalance'),
-            ticketSubtotal = self.get('ticketSubtotal');
+            ticketSubtotal = self.get('ticketSubtotal'),
+            playerTickets = self.get('playerTickets'),
+            winningNumbersTemplate = self.getTemplate('winningNumbers'),
+            winningNumbers = [];
+
+        // Reset the form state.
+        self.clearError();
 
         // Confirm that the player has enough money in their balance to afford the requested tickets.
         if (playerBalance >= ticketSubtotal) {
             // Subtract the total amount for the tickets from the player's balance.
-            self.set('playerBalance', playerBalance - ticketSubtotal);
+            playerBalance = self.set('playerBalance', playerBalance - ticketSubtotal);
+
+            // Generate the winning numbers.
+            winningNumbers = self.generateWinningNumbers(4);
+
+            // Update the winning numbers in the view.
+            $('#winningNumbers').html(winningNumbersTemplate({
+                winningNumbers: winningNumbers
+            }));
+
+            // Iterate over purchased tickets and compare them to the winning numbers.
+            for (var ticketIndex in playerTickets) {
+                // Store the current ticket and check the matching numbers.
+                var currentTicket = playerTickets[ticketIndex],
+                    totalMatchingNumbers = self.checkNumberMatchCount(currentTicket, winningNumbers);
+
+                // If the player has at least one matching number.
+                if (totalMatchingNumbers !== 0) {
+
+                    // Credit the player's balance with the appropriate funds for this winning ticket.
+                    // (2^n)^2 (Two dollars to the power of number correct, squared.) Remember that anything to a 0 power is 1.
+                    // 1 = $4, 2 = $16, 3 = $64, 4 = $256
+                    playerBalance = self.set('playerBalance', playerBalance + Math.pow(Math.pow(2, totalMatchingNumbers), 2));
+
+                }
+
+                console.log('numbers correct', totalMatchingNumbers);
+            }
+
         } else {
             // Log that the player attempted to purchase more tickets than they could afford.
             self.log('Player does not have enough money to buy tickets.');
