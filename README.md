@@ -30,7 +30,7 @@ Build a webpage which does the following:
 
 ## Liberties Taken
 
-1. I'm utilizing frameworks rather than reinventing the wheel and utilizing vanilla JavaScript. For this project I'll be using jQuery for field and DOM manipulation as well as Underscore for utility and templating.
+1. I'm utilizing frameworks rather than reinventing the wheel with vanilla JavaScript. For this project I'll be using jQuery for field and DOM manipulation as well as Underscore for utility and templating.
 2. I've used (2^n)^2 as my winnings formula, where n is the number of matching numbers. If there are no matches, the script prevents running the formula as 2^0^2, because anything to a zero power is one.
 3. Only having numbers 1 through 10 gave users too high of odds for winning, which made it nearly impossible to ever reach a zero balance.
 4. LocalStorage is used to store the Player's Balance, rather than a "high score", so a player can return to the game later and pick back up.
